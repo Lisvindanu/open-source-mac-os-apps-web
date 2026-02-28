@@ -12,16 +12,29 @@
         <header>
             <img src="icons/icon.png" alt="macOS Icon" class="header-icon">
             <h1>Awesome macOS Open Source Applications</h1>
-            <p class="subtitle">A curated list of open source applications for macOS</p>
+            <p class="subtitle">A curated list of <span id="total-apps">822</span> open source applications for macOS</p>
             <div class="stats" id="stats">
-                <span class="stat-item">📱 <span id="total-apps">689</span> Apps</span>
-                <span class="stat-item">📂 <span id="total-categories">49</span> Categories</span>
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-apps">822</div>
+                    <div class="stat-label">Applications</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-categories">39</div>
+                    <div class="stat-label">Categories</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-languages">19</div>
+                    <div class="stat-label">Languages</div>
+                </div>
             </div>
         </header>
 
         <div class="controls">
             <div class="search-box">
-                <input type="text" id="search" placeholder="🔍 Search apps...">
+                <svg class="search-icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                    <path d="M9 17A8 8 0 1 0 9 1a8 8 0 0 0 0 16zM19 19l-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <input type="text" id="search" placeholder="Search applications...">
             </div>
 
             <div class="filters">
@@ -35,8 +48,15 @@
             </div>
         </div>
 
+        <div class="results-info">
+            <span id="results-count">Loading applications...</span>
+        </div>
+
         <div id="apps-container" class="apps-grid">
-            <div class="loading">Loading applications...</div>
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Loading applications...</p>
+            </div>
         </div>
     </div>
 

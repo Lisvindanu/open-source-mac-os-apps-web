@@ -1,99 +1,38 @@
 // Global variables
 let allApps = [];
 let filteredApps = [];
-let categories = new Set();
-let languages = new Set();
+let appData = null;
 
-// Load and parse README
+// Load apps from JSON
 async function loadApps() {
     try {
-        const response = await fetch('README.md');
-        const text = await response.text();
-        parseReadme(text);
+        const response = await fetch('apps.json');
+        appData = await response.json();
+
+        allApps = appData.apps;
+        filteredApps = allApps;
+
+        // Update stats
+        updateStats();
+
+        // Initialize filters
         initializeFilters();
+
+        // Display all apps
         displayApps(allApps);
     } catch (error) {
-        console.error('Error loading README:', error);
-        document.getElementById('apps-container').innerHTML = '<div class="no-results">Error loading applications. Please try again later.</div>';
+        console.error('Error loading apps:', error);
+        document.getElementById('apps-container').innerHTML =
+            '<div class="no-results"><p>Error loading applications. Please try again later.</p></div>';
     }
 }
 
-// Parse README markdown
-function parseReadme(text) {
-    const lines = text.split('\n');
-    let currentCategory = '';
-    let currentApp = null;
-    let inApp = false;
-
-    for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-
-        // Match category headers like "### 🎵 Audio (39)"
-        const categoryMatch = line.match(/^###\s+(.+?)\s+\((\d+)\)/);
-        if (categoryMatch) {
-            currentCategory = categoryMatch[1].replace(/^[^\w]+/, '').trim(); // Remove emoji
-            categories.add(currentCategory);
-            continue;
-        }
-
-        // Match app entries (lines starting with "- [")
-        const appMatch = line.match(/^-\s+\[(.+?)\]\((.+?)\)\s+-?\s*(.*)/);
-        if (appMatch && currentCategory) {
-            // Save previous app if exists
-            if (currentApp) {
-                allApps.push(currentApp);
-            }
-
-            currentApp = {
-                name: appMatch[1],
-                url: appMatch[2],
-                description: appMatch[3] || '',
-                category: currentCategory,
-                languages: [],
-                website: '',
-                badges: []
-            };
-            inApp = true;
-            continue;
-        }
-
-        if (inApp && currentApp) {
-            // Parse languages
-            const langMatch = line.match(/\*\*Languages:\*\*(.+)/);
-            if (langMatch) {
-                const langText = langMatch[1];
-                const langMatches = langText.matchAll(/alt='(\w+).*?'.*?title='(\w+)'/g);
-                for (const match of langMatches) {
-                    const lang = match[2];
-                    currentApp.languages.push(lang);
-                    languages.add(lang);
-                }
-            }
-
-            // Parse website
-            const websiteMatch = line.match(/\*\*Website:\*\*\s+\[(.+?)\]\((.+?)\)/);
-            if (websiteMatch) {
-                currentApp.website = websiteMatch[2];
-            }
-
-            // Detect end of app entry (empty line or new app)
-            if (line.trim() === '' || line.startsWith('- [')) {
-                if (line.startsWith('- [')) {
-                    i--; // Reprocess this line
-                }
-                inApp = false;
-            }
-        }
-    }
-
-    // Add last app
-    if (currentApp) {
-        allApps.push(currentApp);
-    }
-
-    // Update stats
-    document.getElementById('total-apps').textContent = allApps.length;
-    document.getElementById('total-categories').textContent = categories.size;
+// Update statistics
+function updateStats() {
+    document.getElementById('stat-apps').textContent = appData.stats.total_apps;
+    document.getElementById('stat-categories').textContent = appData.stats.total_categories;
+    document.getElementById('stat-languages').textContent = appData.languages.length;
+    document.getElementById('total-apps').textContent = appData.stats.total_apps;
 }
 
 // Initialize filter dropdowns
@@ -101,18 +40,18 @@ function initializeFilters() {
     const categoryFilter = document.getElementById('category-filter');
     const languageFilter = document.getElementById('language-filter');
 
-    // Sort and add categories
-    const sortedCategories = Array.from(categories).sort();
-    sortedCategories.forEach(category => {
+    // Add categories (sorted by name)
+    const categories = Object.keys(appData.stats.categories).sort();
+    categories.forEach(category => {
+        const count = appData.stats.categories[category];
         const option = document.createElement('option');
         option.value = category;
-        option.textContent = category;
+        option.textContent = `${category} (${count})`;
         categoryFilter.appendChild(option);
     });
 
-    // Sort and add languages
-    const sortedLanguages = Array.from(languages).sort();
-    sortedLanguages.forEach(language => {
+    // Add languages (already sorted from parser)
+    appData.languages.forEach(language => {
         const option = document.createElement('option');
         option.value = language;
         option.textContent = language;
@@ -135,7 +74,8 @@ function filterApps() {
         // Search filter
         const matchesSearch = !searchTerm ||
             app.name.toLowerCase().includes(searchTerm) ||
-            app.description.toLowerCase().includes(searchTerm);
+            app.description.toLowerCase().includes(searchTerm) ||
+            app.languages.some(lang => lang.toLowerCase().includes(searchTerm));
 
         // Category filter
         const matchesCategory = !categoryFilter || app.category === categoryFilter;
@@ -146,7 +86,21 @@ function filterApps() {
         return matchesSearch && matchesCategory && matchesLanguage;
     });
 
+    updateResultsCount();
     displayApps(filteredApps);
+}
+
+// Update results count
+function updateResultsCount() {
+    const count = filteredApps.length;
+    const total = allApps.length;
+    const resultsCount = document.getElementById('results-count');
+
+    if (count === total) {
+        resultsCount.textContent = `Showing all ${total} applications`;
+    } else {
+        resultsCount.textContent = `Showing ${count} of ${total} applications`;
+    }
 }
 
 // Display apps in the grid
@@ -154,7 +108,11 @@ function displayApps(apps) {
     const container = document.getElementById('apps-container');
 
     if (apps.length === 0) {
-        container.innerHTML = '<div class="no-results">No applications found matching your criteria.</div>';
+        container.innerHTML = `
+            <div class="no-results">
+                <p>No applications found matching your criteria.</p>
+            </div>
+        `;
         return;
     }
 
@@ -163,28 +121,61 @@ function displayApps(apps) {
 
 // Create HTML for a single app card
 function createAppCard(app) {
-    const languagesHTML = app.languages.map(lang => {
-        const iconPath = getLanguageIcon(lang);
-        return `
-            <span class="language-tag">
-                <img src="${iconPath}" alt="${lang}" class="language-icon">
-                ${lang}
-            </span>
-        `;
-    }).join('');
+    const languagesHTML = app.languages.length > 0 ? `
+        <div class="app-languages">
+            ${app.languages.map(lang => {
+                const iconPath = getLanguageIcon(lang);
+                return `
+                    <span class="language-tag">
+                        <img src="${iconPath}" alt="${lang}" class="language-icon" onerror="this.style.display='none'">
+                        ${lang}
+                    </span>
+                `;
+            }).join('')}
+        </div>
+    ` : '';
 
-    const websiteHTML = app.website ?
-        `<a href="${app.website}" target="_blank" class="app-website">🌐 Website</a>` : '';
+    const metaLinks = [];
+
+    // GitHub link
+    metaLinks.push(`
+        <a href="${app.url}" target="_blank" rel="noopener noreferrer" class="app-link">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+            </svg>
+            GitHub
+        </a>
+    `);
+
+    // Website link
+    if (app.website) {
+        metaLinks.push(`
+            <a href="${app.website}" target="_blank" rel="noopener noreferrer" class="app-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="2" y1="12" x2="22" y2="12"/>
+                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                </svg>
+                Website
+            </a>
+        `);
+    }
+
+    const metaHTML = metaLinks.length > 0 ? `
+        <div class="app-meta">
+            ${metaLinks.join('')}
+        </div>
+    ` : '';
 
     return `
         <div class="app-card">
             <div class="app-header">
-                <a href="${app.url}" target="_blank" class="app-name">${app.name}</a>
-                <span class="app-category">${app.category}</span>
+                <a href="${app.url}" target="_blank" rel="noopener noreferrer" class="app-name">${escapeHtml(app.name)}</a>
+                <span class="app-category">${escapeHtml(app.category)}</span>
             </div>
-            <p class="app-description">${app.description}</p>
-            ${languagesHTML ? `<div class="app-languages">${languagesHTML}</div>` : ''}
-            ${websiteHTML}
+            <p class="app-description">${escapeHtml(app.description || 'No description available.')}</p>
+            ${languagesHTML}
+            ${metaHTML}
         </div>
     `;
 }
@@ -215,6 +206,13 @@ function getLanguageIcon(language) {
     };
 
     return iconMap[language] || 'icons/icon.png';
+}
+
+// Escape HTML to prevent XSS
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 // Initialize on page load
