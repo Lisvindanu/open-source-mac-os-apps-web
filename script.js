@@ -62,6 +62,7 @@ function initializeFilters() {
     document.getElementById('search').addEventListener('input', filterApps);
     categoryFilter.addEventListener('change', filterApps);
     languageFilter.addEventListener('change', filterApps);
+    document.getElementById('sort-filter').addEventListener('change', filterApps);
 }
 
 // Filter apps based on search and filters
@@ -69,6 +70,7 @@ function filterApps() {
     const searchTerm = document.getElementById('search').value.toLowerCase();
     const categoryFilter = document.getElementById('category-filter').value;
     const languageFilter = document.getElementById('language-filter').value;
+    const sortFilter = document.getElementById('sort-filter').value;
 
     filteredApps = allApps.filter(app => {
         // Search filter
@@ -84,6 +86,28 @@ function filterApps() {
         const matchesLanguage = !languageFilter || app.languages.includes(languageFilter);
 
         return matchesSearch && matchesCategory && matchesLanguage;
+    });
+
+    // Sort apps
+    filteredApps.sort((a, b) => {
+        switch (sortFilter) {
+            case 'name':
+                return a.name.localeCompare(b.name);
+            case 'name-desc':
+                return b.name.localeCompare(a.name);
+            case 'recent':
+                // Sort by apps with last_commit first, then alphabetically
+                if (a.last_commit && !b.last_commit) return -1;
+                if (!a.last_commit && b.last_commit) return 1;
+                return a.name.localeCompare(b.name);
+            case 'popular':
+                // Sort by apps with stars first, then alphabetically
+                if (a.stars && !b.stars) return -1;
+                if (!a.stars && b.stars) return 1;
+                return a.name.localeCompare(b.name);
+            default:
+                return 0;
+        }
     });
 
     updateResultsCount();

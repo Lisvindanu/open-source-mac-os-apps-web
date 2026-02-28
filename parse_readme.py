@@ -56,7 +56,8 @@ def parse_readme(filename='README.md'):
                 'website': '',
                 'screenshots': [],
                 'license': '',
-                'stars': ''
+                'stars': 0,
+                'last_commit': ''
             }
 
             # Parse following lines for more details
@@ -82,10 +83,22 @@ def parse_readme(filename='README.md'):
                 if website_match:
                     current_app['website'] = website_match.group(1)
 
-                # Parse badges/stars
-                stars_match = re.search(r'github\.com/stars/([^?\'">]+)', detail_line)
+                # Parse stars from badge
+                stars_match = re.search(r'shields\.io/github/stars/([^?\'">]+)', detail_line)
                 if stars_match:
-                    current_app['stars'] = stars_match.group(1)
+                    # Try to extract from repo path
+                    repo_parts = stars_match.group(1).split('/')
+                    if len(repo_parts) >= 2:
+                        # Store as repo path for now, will use for sorting
+                        current_app['stars'] = f"{repo_parts[0]}/{repo_parts[1]}"
+
+                # Parse last commit badge
+                commit_match = re.search(r'shields\.io/github/last-commit/([^?\'">]+)', detail_line)
+                if commit_match:
+                    # Extract repo path
+                    repo_parts = commit_match.group(1).split('/')
+                    if len(repo_parts) >= 2:
+                        current_app['last_commit'] = f"{repo_parts[0]}/{repo_parts[1]}"
 
                 # Check for screenshots section
                 if '<details>' in detail_line or 'Screenshots' in detail_line:
