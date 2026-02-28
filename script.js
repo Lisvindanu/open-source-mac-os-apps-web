@@ -126,6 +126,11 @@ function createAppCard(app) {
         ? `<img src="${app.screenshots[0]}" alt="${escapeHtml(app.name)}" loading="lazy">`
         : `<div class="app-screenshot-placeholder">${getFirstLetter(app.name)}</div>`;
 
+    // No images badge
+    const noImageBadge = app.screenshots.length === 0
+        ? `<div class="no-image-badge">⚠️ No Images</div>`
+        : '';
+
     // Get first 2 languages for compact display
     const languagesHTML = app.languages.slice(0, 2).map(lang =>
         `<span class="language-tag-small">${lang}</span>`
@@ -139,6 +144,7 @@ function createAppCard(app) {
         <div class="app-card" onclick="showAppDetail('${app.id}')">
             <div class="app-screenshot">
                 ${screenshotHTML}
+                ${noImageBadge}
             </div>
             <div class="app-info">
                 <div class="app-category-badge">${escapeHtml(app.category)}</div>
