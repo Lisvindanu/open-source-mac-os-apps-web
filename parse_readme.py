@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import re
 import json
+import hashlib
 
 def parse_readme(filename='README.md'):
     with open(filename, 'r', encoding='utf-8') as f:
@@ -16,6 +17,7 @@ def parse_readme(filename='README.md'):
     lines = content.split('\n')
     current_category = None
     current_app = None
+    in_description = False
     i = 0
 
     while i < len(lines):
@@ -38,22 +40,37 @@ def parse_readme(filename='README.md'):
             if current_app:
                 apps.append(current_app)
 
+            app_name = app_match.group(1).strip()
+            app_url = app_match.group(2).strip()
+
+            # Generate unique ID from URL
+            app_id = hashlib.md5(app_url.encode()).hexdigest()[:12]
+
             current_app = {
-                'name': app_match.group(1).strip(),
-                'url': app_match.group(2).strip(),
+                'id': app_id,
+                'name': app_name,
+                'url': app_url,
                 'description': app_match.group(3).strip(),
                 'category': current_category,
                 'languages': [],
                 'website': '',
-                'stars': '',
+                'screenshots': [],
                 'license': '',
-                'screenshots': []
+                'stars': ''
             }
 
             # Parse following lines for more details
             i += 1
-            while i < len(lines) and not lines[i].startswith('- [') and current_category:
+            in_screenshots = False
+
+            while i < len(lines):
                 detail_line = lines[i]
+
+                # Stop if we hit a new category or app
+                if re.match(category_pattern, detail_line):
+                    break
+                if detail_line.startswith('- [') and not detail_line.strip().startswith('- [x]'):
+                    break
 
                 # Parse languages
                 if '**Languages:**' in detail_line:
@@ -66,26 +83,28 @@ def parse_readme(filename='README.md'):
                     current_app['website'] = website_match.group(1)
 
                 # Parse badges/stars
-                stars_match = re.search(r'github\.com/stars/([^?]+)', detail_line)
+                stars_match = re.search(r'github\.com/stars/([^?\'">]+)', detail_line)
                 if stars_match:
                     current_app['stars'] = stars_match.group(1)
 
-                # Parse license
-                license_match = re.search(r'github\.com/license/([^\'">]+)', detail_line)
-                if license_match:
-                    current_app['license'] = license_match.group(1)
+                # Check for screenshots section
+                if '<details>' in detail_line or 'Screenshots' in detail_line:
+                    in_screenshots = True
 
-                # Parse screenshots
-                if detail_line.strip().startswith('<img src='):
-                    screenshot_match = re.search(r"<img src='([^']+)'", detail_line)
-                    if screenshot_match:
-                        current_app['screenshots'].append(screenshot_match.group(1))
+                # Parse screenshot URLs
+                if in_screenshots:
+                    # Match both <img src='...' and <img src="..."
+                    screenshot_matches = re.findall(r"<img src=['\"]([^'\"]+)['\"]", detail_line)
+                    for screenshot_url in screenshot_matches:
+                        if screenshot_url and screenshot_url not in current_app['screenshots']:
+                            current_app['screenshots'].append(screenshot_url)
 
-                # Check if we're entering a new category or app
-                if re.match(category_pattern, detail_line) or detail_line.startswith('- ['):
-                    break
+                # End of screenshots section
+                if '</details>' in detail_line:
+                    in_screenshots = False
 
                 i += 1
+
             continue
 
         i += 1
@@ -119,6 +138,10 @@ if __name__ == '__main__':
     print(f"Found {data['stats']['total_apps']} apps")
     print(f"Found {data['stats']['total_categories']} categories")
     print(f"Found {len(data['languages'])} languages")
+
+    # Count apps with screenshots
+    apps_with_screenshots = sum(1 for app in data['apps'] if app['screenshots'])
+    print(f"Found {apps_with_screenshots} apps with screenshots")
 
     # Save to JSON
     with open('apps.json', 'w', encoding='utf-8') as f:

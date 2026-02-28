@@ -121,64 +121,148 @@ function displayApps(apps) {
 
 // Create HTML for a single app card
 function createAppCard(app) {
+    // Get first screenshot or use placeholder
+    const screenshotHTML = app.screenshots.length > 0
+        ? `<img src="${app.screenshots[0]}" alt="${escapeHtml(app.name)}" loading="lazy">`
+        : `<div class="app-screenshot-placeholder">${getFirstLetter(app.name)}</div>`;
+
+    // Get first 2 languages for compact display
+    const languagesHTML = app.languages.slice(0, 2).map(lang =>
+        `<span class="language-tag-small">${lang}</span>`
+    ).join('');
+
+    const moreLanguages = app.languages.length > 2
+        ? `<span class="language-tag-small">+${app.languages.length - 2}</span>`
+        : '';
+
+    return `
+        <div class="app-card" onclick="showAppDetail('${app.id}')">
+            <div class="app-screenshot">
+                ${screenshotHTML}
+            </div>
+            <div class="app-info">
+                <div class="app-category-badge">${escapeHtml(app.category)}</div>
+                <div class="app-name">${escapeHtml(app.name)}</div>
+                <p class="app-description">${escapeHtml(app.description || 'No description available.')}</p>
+                ${languagesHTML || moreLanguages ? `
+                    <div class="app-languages-compact">
+                        ${languagesHTML}
+                        ${moreLanguages}
+                    </div>
+                ` : ''}
+            </div>
+        </div>
+    `;
+}
+
+// Get first letter for placeholder
+function getFirstLetter(name) {
+    return name.charAt(0).toUpperCase();
+}
+
+// Show app detail modal
+function showAppDetail(appId) {
+    const app = allApps.find(a => a.id === appId);
+    if (!app) return;
+
+    const modal = document.getElementById('app-modal');
+    const modalBody = document.getElementById('modal-body');
+
+    // Build header image
+    const headerImage = app.screenshots.length > 0
+        ? `<img src="${app.screenshots[0]}" alt="${escapeHtml(app.name)}" class="modal-header-image">`
+        : '';
+
+    // Build languages section
     const languagesHTML = app.languages.length > 0 ? `
-        <div class="app-languages">
-            ${app.languages.map(lang => {
-                const iconPath = getLanguageIcon(lang);
-                return `
-                    <span class="language-tag">
-                        <img src="${iconPath}" alt="${lang}" class="language-icon" onerror="this.style.display='none'">
-                        ${lang}
-                    </span>
-                `;
-            }).join('')}
+        <div class="modal-section">
+            <div class="modal-section-title">Programming Languages</div>
+            <div class="modal-languages">
+                ${app.languages.map(lang => {
+                    const iconPath = getLanguageIcon(lang);
+                    return `
+                        <span class="language-tag">
+                            <img src="${iconPath}" alt="${lang}" class="language-icon" onerror="this.style.display='none'">
+                            ${lang}
+                        </span>
+                    `;
+                }).join('')}
+            </div>
         </div>
     ` : '';
 
-    const metaLinks = [];
-
-    // GitHub link
-    metaLinks.push(`
-        <a href="${app.url}" target="_blank" rel="noopener noreferrer" class="app-link">
+    // Build links
+    const links = [];
+    links.push(`
+        <a href="${app.url}" target="_blank" rel="noopener noreferrer" class="modal-link">
             <svg viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
             </svg>
-            GitHub
+            View on GitHub
         </a>
     `);
 
-    // Website link
     if (app.website) {
-        metaLinks.push(`
-            <a href="${app.website}" target="_blank" rel="noopener noreferrer" class="app-link">
+        links.push(`
+            <a href="${app.website}" target="_blank" rel="noopener noreferrer" class="modal-link">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="10"/>
                     <line x1="2" y1="12" x2="22" y2="12"/>
                     <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
                 </svg>
-                Website
+                Visit Website
             </a>
         `);
     }
 
-    const metaHTML = metaLinks.length > 0 ? `
-        <div class="app-meta">
-            ${metaLinks.join('')}
+    // Build screenshots section
+    const screenshotsHTML = app.screenshots.length > 1 ? `
+        <div class="modal-section">
+            <div class="modal-section-title">Screenshots (${app.screenshots.length})</div>
+            <div class="modal-screenshots">
+                ${app.screenshots.map(screenshot => `
+                    <img src="${screenshot}" alt="${escapeHtml(app.name)} screenshot"
+                         class="modal-screenshot" loading="lazy"
+                         onclick="window.open('${screenshot}', '_blank')">
+                `).join('')}
+            </div>
         </div>
     ` : '';
 
-    return `
-        <div class="app-card">
-            <div class="app-header">
-                <a href="${app.url}" target="_blank" rel="noopener noreferrer" class="app-name">${escapeHtml(app.name)}</a>
-                <span class="app-category">${escapeHtml(app.category)}</span>
-            </div>
-            <p class="app-description">${escapeHtml(app.description || 'No description available.')}</p>
-            ${languagesHTML}
-            ${metaHTML}
+    modalBody.innerHTML = `
+        ${headerImage}
+        <h2 class="modal-title">${escapeHtml(app.name)}</h2>
+        <div class="modal-meta">
+            <span class="modal-badge">📂 ${escapeHtml(app.category)}</span>
+            ${app.screenshots.length > 0 ? `<span class="modal-badge">📸 ${app.screenshots.length} Screenshots</span>` : ''}
         </div>
+        ${app.description ? `<p class="modal-description">${escapeHtml(app.description)}</p>` : ''}
+        ${languagesHTML}
+        <div class="modal-section">
+            <div class="modal-links">
+                ${links.join('')}
+            </div>
+        </div>
+        ${screenshotsHTML}
     `;
+
+    modal.classList.add('show');
+    document.body.style.overflow = 'hidden';
 }
+
+// Close modal
+function closeModal() {
+    const modal = document.getElementById('app-modal');
+    modal.classList.remove('show');
+    document.body.style.overflow = '';
+}
+
+// Close modal on Escape key
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        closeModal();
+    }
+});
 
 // Get language icon path
 function getLanguageIcon(language) {
